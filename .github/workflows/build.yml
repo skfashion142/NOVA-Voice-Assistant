@@ -1,0 +1,68 @@
+name: Build NOVA from zip
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Zip kholo
+        run: |
+          set -e
+          ls -la
+          unzip -q NOVA_v15_assistant.zip -d work
+          ROOT=$(dirname "$(find work -name settings.gradle.kts | head -n 1)")
+          echo "Project folder: $ROOT"
+          echo "ROOT=$ROOT" >> "$GITHUB_ENV"
+
+      - name: Awaaz model download (offline wake word)
+        run: |
+          set -e
+          cd "$ROOT/app/src/main/assets"
+          curl -fsSL -o en.zip https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
+          unzip -q en.zip && mv vosk-model-small-en-us-0.15 model-en && rm en.zip
+          test -f model-en/am/final.mdl
+          if curl -fsSL -o in.zip https://alphacephei.com/vosk/models/vosk-model-small-en-in-0.4.zip; then
+            unzip -q in.zip && mv vosk-model-small-en-in-0.4 model-en-in && rm in.zip
+          else
+            echo "en-in model nahi mila, app model-en par chalega"
+          fi
+          du -sh .
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.7
+
+      - name: Tests (fail ho to bhi APK banega)
+        continue-on-error: true
+        run: |
+          cd "$ROOT"
+          gradle testDebugUnitTest --no-daemon
+
+      - name: APK banao
+        run: |
+          cd "$ROOT"
+          gradle assembleDebug --no-daemon
+
+      - name: APK upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-apk
+          path: ${{ env.ROOT }}/app/build/outputs/apk/debug/*.apk
+
+      - name: Test report upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: ${{ env.ROOT }}/app/build/reports/tests
+          if-no-files-found: ignore
