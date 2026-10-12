@@ -14,7 +14,7 @@ jobs:
         run: |
           set -e
           ls -la
-          unzip -q NOVA_v15_assistant.zip -d work
+          unzip -q NOVA-Voice-Assistant.zip -d work
           ROOT=$(dirname "$(find work -name settings.gradle.kts | head -n 1)")
           echo "Project folder: $ROOT"
           echo "ROOT=$ROOT" >> "$GITHUB_ENV"
